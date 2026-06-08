@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+.env
+data/uploads/
+data/parsed_docs/
+data/indexes/
+data/sample_docs/
+*.faiss
+*.meta.json
+.DS_Store
