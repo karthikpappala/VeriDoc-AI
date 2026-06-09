@@ -13,7 +13,7 @@ langchain-core==0.2.11
 sentence-transformers==3.0.1
 
 # ── Vector store ─────────────────────────────────────────────
-faiss-cpu==1.8.0
+faiss-cpu==1.14.2
 
 # ── LLM inference ────────────────────────────────────────────
 # Option A: local (needs GPU/decent CPU)
