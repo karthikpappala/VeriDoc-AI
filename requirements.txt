@@ -1,4 +1,3 @@
-cat > requirements.txt << 'EOF'
 PyMuPDF
 sentence-transformers
 faiss-cpu
@@ -14,4 +13,3 @@ langchain-huggingface
 ragas
 datasets
 numpy
-EOF
