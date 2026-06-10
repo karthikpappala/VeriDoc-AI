@@ -3,4 +3,4 @@ from core.document_store import DocumentStore
 from core.embedder import Embedder
 from core.vector_store import VectorStore
 __all__ = ["parse_pdf", "ParsedDocument", "Chunk", "DocumentStore", "Embedder", "VectorStore"]
-
+from core.language_utils import detect_language, translate, process_multilingual_query, translate_answer
