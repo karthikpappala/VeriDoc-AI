@@ -1,15 +1,10 @@
 """
-VeriDoc AI — Streamlit Frontend
+VeriDoc AI — Streamlit Frontend v3
 Run: streamlit run ui/app.py
 """
 
 import streamlit as st
 import requests
-import json
-import time
-from pathlib import Path
-
-# ── Config ────────────────────────────────────────────────────────────────────
 
 API_BASE = "http://localhost:8000"
 
@@ -20,400 +15,400 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Styling ───────────────────────────────────────────────────────────────────
+# ── Session state ─────────────────────────────────────────────────────────────
+if "messages"          not in st.session_state: st.session_state.messages = []
+if "active_doc"        not in st.session_state: st.session_state.active_doc = None
+if "active_doc_name"   not in st.session_state: st.session_state.active_doc_name = None
+if "last_response"     not in st.session_state: st.session_state.last_response = None
+if "admin_mode"        not in st.session_state: st.session_state.admin_mode = False
+if "dark_mode"         not in st.session_state: st.session_state.dark_mode = True
 
-st.markdown("""
+DARK = st.session_state.dark_mode
+
+# ── Theme tokens ──────────────────────────────────────────────────────────────
+if DARK:
+    BG          = "#050d1f"
+    BG2         = "#0a1628"
+    BG3         = "#0f1e38"
+    BORDER      = "rgba(99,102,241,0.15)"
+    TEXT        = "#e2e8f0"
+    TEXT2       = "#7c8fa8"
+    TEXT3       = "#334155"
+    CARD_BG     = "rgba(15,23,42,0.8)"
+    GRAD_ORB    = "radial-gradient(ellipse 70% 60% at 15% 5%, rgba(99,102,241,0.12) 0%, transparent 55%), radial-gradient(ellipse 50% 40% at 85% 90%, rgba(16,185,129,0.08) 0%, transparent 55%)"
+    USER_BG     = "linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(139,92,246,0.1) 100%)"
+    USER_BORDER = "rgba(99,102,241,0.25)"
+    AI_BG       = "rgba(15,23,42,0.7)"
+    AI_BORDER   = "rgba(255,255,255,0.07)"
+    SIDEBAR_BG  = "rgba(8,15,35,0.98)"
+else:
+    BG          = "#f8faff"
+    BG2         = "#eef2ff"
+    BG3         = "#e0e7ff"
+    BORDER      = "rgba(99,102,241,0.2)"
+    TEXT        = "#1e1b4b"
+    TEXT2       = "#4338ca"
+    TEXT3       = "#6366f1"
+    CARD_BG     = "rgba(255,255,255,0.95)"
+    GRAD_ORB    = "radial-gradient(ellipse 70% 60% at 15% 5%, rgba(99,102,241,0.08) 0%, transparent 55%), radial-gradient(ellipse 50% 40% at 85% 90%, rgba(16,185,129,0.06) 0%, transparent 55%)"
+    USER_BG     = "linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(139,92,246,0.07) 100%)"
+    USER_BORDER = "rgba(99,102,241,0.3)"
+    AI_BG       = "rgba(255,255,255,0.95)"
+    AI_BORDER   = "rgba(99,102,241,0.15)"
+    SIDEBAR_BG  = "rgba(238,242,255,0.98)"
+
+st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+html, body, [class*="css"] {{ font-family: 'Inter', sans-serif; }}
+#MainMenu, footer, header {{ visibility: hidden; }}
+.block-container {{ padding: 1.5rem 2rem 2rem; max-width: 1300px; }}
 
-/* Base */
-html, body, [class*="css"] { font-family: 'Sora', sans-serif; }
+.stApp {{
+    background: {BG};
+    background-image: {GRAD_ORB};
+}}
 
-/* Hide default Streamlit chrome */
-#MainMenu, footer, header { visibility: hidden; }
-.block-container { padding: 2rem 2.5rem 2rem; max-width: 1200px; }
+section[data-testid="stSidebar"] {{
+    background: {SIDEBAR_BG} !important;
+    border-right: 1px solid {BORDER} !important;
+}}
+section[data-testid="stSidebar"] .block-container {{ padding: 1rem 0.75rem; }}
 
-/* Background */
-.stApp {
-    background: #0a0e1a;
-    background-image:
-        radial-gradient(ellipse 80% 50% at 20% 10%, rgba(56, 100, 255, 0.08) 0%, transparent 60%),
-        radial-gradient(ellipse 60% 40% at 80% 80%, rgba(0, 210, 190, 0.06) 0%, transparent 60%);
-}
-
-/* Header */
-.veridoc-header {
-    display: flex; align-items: center; gap: 16px;
-    padding: 1.5rem 0 2rem;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    margin-bottom: 2rem;
-}
-.veridoc-logo {
-    width: 44px; height: 44px; border-radius: 12px;
-    background: linear-gradient(135deg, #3864ff, #00d2be);
+.logo-wrap {{
+    display: flex; align-items: center; gap: 12px;
+    padding: 0.8rem 0.5rem 1rem;
+    border-bottom: 1px solid {BORDER};
+    margin-bottom: 1rem;
+}}
+.logo-icon {{
+    width: 38px; height: 38px; border-radius: 10px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6, #06b6d4);
     display: flex; align-items: center; justify-content: center;
-    font-size: 22px; flex-shrink: 0;
-}
-.veridoc-title { font-size: 22px; font-weight: 600; color: #f0f4ff; letter-spacing: -0.3px; }
-.veridoc-sub { font-size: 12px; color: #5a6a8a; margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
+    font-size: 18px; box-shadow: 0 0 16px rgba(99,102,241,0.4); flex-shrink: 0;
+}}
+.logo-text {{ font-size: 17px; font-weight: 700; color: {TEXT}; letter-spacing: -0.3px; }}
+.logo-sub {{ font-size: 10px; color: {TEXT3}; font-family: 'JetBrains Mono', monospace; margin-top: 1px; }}
 
-/* Sidebar */
-section[data-testid="stSidebar"] {
-    background: #0d1120 !important;
-    border-right: 1px solid rgba(255,255,255,0.06) !important;
-}
-section[data-testid="stSidebar"] .block-container { padding: 1.5rem 1rem; }
+.sec-label {{
+    font-size: 10px; font-weight: 600; color: {TEXT3};
+    text-transform: uppercase; letter-spacing: 0.1em;
+    margin: 0.8rem 0 0.4rem 0.25rem;
+}}
 
-/* Upload area */
-.upload-zone {
-    border: 1.5px dashed rgba(56, 100, 255, 0.35);
-    border-radius: 14px;
-    padding: 2rem;
-    text-align: center;
-    background: rgba(56, 100, 255, 0.04);
-    margin-bottom: 1.5rem;
-    transition: border-color 0.2s;
-}
+.stButton button {{
+    background: rgba(99,102,241,0.08) !important;
+    border: 1px solid {BORDER} !important;
+    border-radius: 10px !important;
+    color: {TEXT2} !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 13px !important; font-weight: 500 !important;
+    transition: all 0.2s !important;
+}}
+.stButton button:hover {{
+    background: rgba(99,102,241,0.18) !important;
+    border-color: rgba(99,102,241,0.45) !important;
+    color: {'#c7d2fe' if DARK else '#4338ca'} !important;
+    box-shadow: 0 0 12px rgba(99,102,241,0.15) !important;
+}}
 
-/* Doc card */
-.doc-card {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 10px;
-    padding: 10px 14px;
-    margin-bottom: 8px;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-.doc-card:hover { background: rgba(56,100,255,0.08); border-color: rgba(56,100,255,0.3); }
-.doc-card.active { background: rgba(56,100,255,0.12); border-color: rgba(56,100,255,0.5); }
-.doc-name { font-size: 13px; font-weight: 500; color: #c8d4f0; }
-.doc-meta { font-size: 11px; color: #4a5a7a; margin-top: 3px; font-family: 'JetBrains Mono', monospace; }
+[data-testid="stFileUploader"] {{
+    background: {'rgba(99,102,241,0.05)' if DARK else 'rgba(99,102,241,0.03)'} !important;
+    border: 1.5px dashed rgba(99,102,241,0.3) !important;
+    border-radius: 14px !important;
+}}
 
-/* Chat */
-.chat-container { display: flex; flex-direction: column; gap: 16px; }
+.stTextInput input {{
+    background: {CARD_BG} !important;
+    border: 1px solid {BORDER} !important;
+    border-radius: 12px !important;
+    color: {TEXT} !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 14px !important;
+}}
+.stTextInput input:focus {{
+    border-color: rgba(99,102,241,0.6) !important;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.1) !important;
+}}
+.stTextInput input::placeholder {{ color: {TEXT3} !important; }}
 
-.msg-user {
-    background: rgba(56,100,255,0.12);
-    border: 1px solid rgba(56,100,255,0.2);
-    border-radius: 14px 14px 4px 14px;
-    padding: 12px 16px;
-    margin-left: 20%;
-    color: #c8d4f0;
-    font-size: 14px;
-    line-height: 1.6;
-}
+[data-testid="stFormSubmitButton"] button {{
+    background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+    border: none !important; border-radius: 10px !important;
+    color: white !important; font-weight: 600 !important;
+    font-size: 13px !important;
+    box-shadow: 0 4px 15px rgba(99,102,241,0.35) !important;
+    transition: all 0.2s !important;
+}}
+[data-testid="stFormSubmitButton"] button:hover {{
+    box-shadow: 0 6px 20px rgba(99,102,241,0.5) !important;
+    transform: translateY(-1px) !important;
+}}
 
-.msg-ai {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 4px 14px 14px 14px;
-    padding: 14px 18px;
-    margin-right: 10%;
-    color: #d0daf0;
-    font-size: 14px;
-    line-height: 1.7;
-}
+.msg-user {{
+    background: {USER_BG};
+    border: 1px solid {USER_BORDER};
+    border-radius: 16px 16px 4px 16px;
+    padding: 14px 18px; margin: 8px 0 8px 15%;
+    color: {TEXT}; font-size: 14px; line-height: 1.65;
+    box-shadow: 0 4px 20px rgba(99,102,241,0.1);
+}}
+.msg-user-label {{
+    font-size: 10px; font-weight: 600; color: #818cf8;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    margin-bottom: 6px; font-family: 'JetBrains Mono', monospace;
+}}
+.msg-ai {{
+    background: {AI_BG};
+    border: 1px solid {AI_BORDER};
+    border-radius: 4px 16px 16px 16px;
+    padding: 16px 20px; margin: 8px 10% 8px 0;
+    color: {TEXT}; font-size: 14px; line-height: 1.75;
+    box-shadow: 0 4px 24px rgba(0,0,0,{'0.2' if DARK else '0.06'});
+    position: relative;
+}}
+.msg-ai::before {{
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, #6366f1, #10b981, transparent);
+    border-radius: 4px 16px 0 0;
+}}
+.msg-ai-label {{
+    font-size: 10px; font-weight: 600; color: #10b981;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    margin-bottom: 8px; font-family: 'JetBrains Mono', monospace;
+}}
 
-.msg-label {
-    font-size: 10px;
-    font-family: 'JetBrains Mono', monospace;
-    color: #3864ff;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin-bottom: 6px;
-    font-weight: 500;
-}
-
-/* Citation card */
-.citation-card {
-    background: rgba(0,210,190,0.05);
-    border: 1px solid rgba(0,210,190,0.15);
-    border-left: 3px solid #00d2be;
-    border-radius: 0 8px 8px 0;
-    padding: 8px 12px;
+.citation-wrap {{
     margin: 6px 0;
-    font-size: 12px;
-    color: #7a9ab0;
+    background: {'rgba(16,185,129,0.05)' if DARK else 'rgba(16,185,129,0.04)'};
+    border: 1px solid rgba(16,185,129,0.15);
+    border-left: 3px solid #10b981;
+    border-radius: 0 10px 10px 0;
+    padding: 10px 14px;
+}}
+.citation-header {{ display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }}
+.citation-rank {{
+    width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(16,185,129,0.2); color: #10b981;
+    font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; flex-shrink: 0;
+}}
+.citation-meta {{ font-size: 11px; color: #10b981; font-family: 'JetBrains Mono', monospace; font-weight: 500; }}
+.citation-score {{ margin-left: auto; font-size: 11px; font-family: 'JetBrains Mono', monospace; color: #f59e0b; font-weight: 600; }}
+.citation-text {{ font-size: 12px; color: {'#4a6080' if DARK else '#6b7280'}; line-height: 1.5; }}
+
+.badges-row {{ display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; padding-top: 10px; border-top: 1px solid {BORDER}; }}
+.badge {{ padding: 4px 10px; border-radius: 20px; font-size: 11px; font-family: 'JetBrains Mono', monospace; font-weight: 600; }}
+.badge-green {{ background: rgba(16,185,129,0.12); color: #10b981; border: 1px solid rgba(16,185,129,0.25); }}
+.badge-yellow {{ background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.25); }}
+.badge-red {{ background: rgba(244,63,94,0.12); color: #f43f5e; border: 1px solid rgba(244,63,94,0.25); }}
+.badge-cyan {{ background: rgba(6,182,212,0.12); color: #22d3ee; border: 1px solid rgba(6,182,212,0.25); }}
+
+.admin-header {{
+    font-size: 10px; font-weight: 600; color: {TEXT3};
+    text-transform: uppercase; letter-spacing: 0.1em;
+    padding: 8px 14px; background: {'rgba(0,0,0,0.3)' if DARK else 'rgba(99,102,241,0.06)'};
+    border-radius: 8px 8px 0 0;
+    display: grid; grid-template-columns: 24px 60px 44px 1fr;
+    gap: 8px; font-family: 'JetBrains Mono', monospace;
+}}
+.admin-row {{
+    padding: 9px 14px;
+    display: grid; grid-template-columns: 24px 60px 44px 1fr;
+    gap: 8px; font-size: 12px;
+    border-bottom: 1px solid {'rgba(255,255,255,0.03)' if DARK else 'rgba(99,102,241,0.06)'};
     font-family: 'JetBrains Mono', monospace;
-    line-height: 1.5;
-}
-.citation-header {
-    color: #00d2be;
-    font-weight: 500;
-    margin-bottom: 4px;
-    font-size: 11px;
-}
-.citation-text { color: #6a8a9a; }
+}}
+.admin-rank {{ color: #6366f1; font-weight: 600; }}
+.admin-page-val {{ color: {TEXT3}; }}
+.admin-text-val {{ color: {TEXT3}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
 
-/* Score badges */
-.score-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-.score-badge {
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 500;
-}
-.score-green { background: rgba(0,200,100,0.1); color: #00c864; border: 1px solid rgba(0,200,100,0.2); }
-.score-yellow { background: rgba(255,180,0,0.1); color: #ffb400; border: 1px solid rgba(255,180,0,0.2); }
-.score-red { background: rgba(255,60,60,0.1); color: #ff3c3c; border: 1px solid rgba(255,60,60,0.2); }
-.score-blue { background: rgba(56,100,255,0.1); color: #6890ff; border: 1px solid rgba(56,100,255,0.2); }
+.metric-card {{
+    background: {CARD_BG};
+    border: 1px solid {BORDER};
+    border-radius: 10px; padding: 12px 14px; text-align: center; margin-bottom: 8px;
+}}
+.metric-val {{ font-size: 22px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }}
+.metric-lbl {{ font-size: 10px; color: {TEXT3}; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.06em; }}
 
-/* Input */
-.stTextInput input, .stTextArea textarea {
-    background: rgba(255,255,255,0.04) !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
-    border-radius: 10px !important;
-    color: #c8d4f0 !important;
-    font-family: 'Sora', sans-serif !important;
-}
-.stTextInput input:focus, .stTextArea textarea:focus {
-    border-color: rgba(56,100,255,0.5) !important;
-    box-shadow: 0 0 0 2px rgba(56,100,255,0.1) !important;
-}
+/* Upload zone on main page */
+.upload-main {{
+    background: {'rgba(99,102,241,0.05)' if DARK else 'rgba(99,102,241,0.03)'};
+    border: 2px dashed rgba(99,102,241,0.3);
+    border-radius: 20px; padding: 2.5rem 2rem;
+    text-align: center; margin: 1.5rem auto;
+    max-width: 560px;
+    transition: border-color 0.2s;
+}}
+.upload-main:hover {{ border-color: rgba(99,102,241,0.55); }}
 
-/* Button */
-.stButton button {
-    background: linear-gradient(135deg, #3864ff, #2a50d0) !important;
-    border: none !important;
-    border-radius: 10px !important;
-    color: white !important;
-    font-family: 'Sora', sans-serif !important;
-    font-weight: 500 !important;
-    padding: 0.5rem 1.5rem !important;
-    transition: opacity 0.15s !important;
-}
-.stButton button:hover { opacity: 0.85 !important; }
+.doc-indicator {{
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #10b981; box-shadow: 0 0 8px rgba(16,185,129,0.6);
+    flex-shrink: 0; animation: pulse 2s infinite; display:inline-block;
+}}
+@keyframes pulse {{
+    0%,100% {{ box-shadow: 0 0 8px rgba(16,185,129,0.6); }}
+    50% {{ box-shadow: 0 0 16px rgba(16,185,129,0.9); }}
+}}
 
-/* Metrics */
-.metric-box {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 10px;
-    padding: 14px 16px;
-    text-align: center;
-}
-.metric-val { font-size: 24px; font-weight: 600; color: #c8d4f0; font-family: 'JetBrains Mono', monospace; }
-.metric-lbl { font-size: 11px; color: #4a5a7a; margin-top: 4px; }
+.main-header {{
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 0 1.2rem;
+    border-bottom: 1px solid {BORDER};
+    margin-bottom: 1.5rem;
+}}
+.streamlit-expanderHeader {{
+    background: {'rgba(10,18,40,0.6)' if DARK else 'rgba(238,242,255,0.8)'} !important;
+    border: 1px solid rgba(16,185,129,0.15) !important;
+    border-radius: 8px !important;
+    color: #10b981 !important; font-size: 12px !important;
+    font-family: 'JetBrains Mono', monospace !important;
+}}
+hr {{ border-color: {BORDER} !important; }}
 
-/* Spinner */
-.stSpinner { color: #3864ff !important; }
-
-/* Selectbox */
-.stSelectbox select {
-    background: rgba(255,255,255,0.04) !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
-    color: #c8d4f0 !important;
-}
-
-/* Divider */
-hr { border-color: rgba(255,255,255,0.06) !important; }
-
-/* Section labels */
-.section-label {
-    font-size: 10px;
-    font-family: 'JetBrains Mono', monospace;
-    color: #3a4a6a;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    margin-bottom: 10px;
-    font-weight: 500;
-}
-
-/* Risk pill */
-.risk-low { color: #00c864; }
-.risk-medium { color: #ffb400; }
-.risk-high { color: #ff3c3c; }
-
-/* Admin panel */
-.admin-row {
-    display: flex; align-items: center; gap: 8px;
-    padding: 8px 12px;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-    font-size: 12px;
-    font-family: 'JetBrains Mono', monospace;
-}
-.admin-rank { color: #3864ff; width: 20px; flex-shrink: 0; }
-.admin-score { color: #00d2be; width: 50px; flex-shrink: 0; }
-.admin-page { color: #5a6a8a; width: 50px; flex-shrink: 0; }
-.admin-text { color: #5a7a8a; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feature-pill {{
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 20px;
+    font-size: 12px; font-weight: 500; margin: 4px;
+}}
 </style>
 """, unsafe_allow_html=True)
 
-# ── Session state ─────────────────────────────────────────────────────────────
-
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-if "active_doc" not in st.session_state:
-    st.session_state.active_doc = None
-if "active_doc_name" not in st.session_state:
-    st.session_state.active_doc_name = None
-if "last_response" not in st.session_state:
-    st.session_state.last_response = None
-if "admin_mode" not in st.session_state:
-    st.session_state.admin_mode = False
-
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
-
 def api_get(path):
     try:
         r = requests.get(f"{API_BASE}{path}", timeout=10)
         return r.json() if r.ok else None
-    except Exception:
-        return None
+    except: return None
 
 def api_post(path, **kwargs):
     try:
-        r = requests.post(f"{API_BASE}{path}", timeout=60, **kwargs)
+        r = requests.post(f"{API_BASE}{path}", timeout=90, **kwargs)
         return r.json() if r.ok else None
-    except Exception:
-        return None
+    except: return None
 
-def risk_html(risk: str) -> str:
-    icons = {"low": "🟢", "medium": "🟡", "high": "🔴"}
-    return f'{icons.get(risk,"⚪")} {risk.upper()}'
+def score_color(v):
+    if v >= 0.7: return "#10b981"
+    if v >= 0.4: return "#f59e0b"
+    return "#f43f5e"
 
-def score_class(val: float) -> str:
-    if val >= 0.7: return "score-green"
-    if val >= 0.4: return "score-yellow"
-    return "score-red"
+def score_badge_class(v):
+    if v >= 0.7: return "badge-green"
+    if v >= 0.4: return "badge-yellow"
+    return "badge-red"
 
-def render_score_badges(evaluation: dict):
-    faith = evaluation.get("faithfulness", 0)
-    conf  = evaluation.get("confidence", 0)
-    risk  = evaluation.get("hallucination_risk", "unknown")
-    sim   = evaluation.get("top_similarity", 0)
-
-    badges = f"""
-    <div class="score-row">
-        <span class="score-badge {score_class(faith)}">Faith {faith:.2f}</span>
-        <span class="score-badge {score_class(conf)}">Conf {conf:.2f}</span>
-        <span class="score-badge score-blue">Sim {sim:.2f}</span>
-        <span class="score-badge {'score-green' if risk=='low' else 'score-yellow' if risk=='medium' else 'score-red'}">
-            {risk_html(risk)}
-        </span>
-    </div>"""
-    st.markdown(badges, unsafe_allow_html=True)
-
+def render_badges(ev):
+    f = ev.get("faithfulness", 0)
+    c = ev.get("confidence", 0)
+    r = ev.get("hallucination_risk", "unknown")
+    s = ev.get("top_similarity", 0)
+    risk_icon = {"low":"🟢","medium":"🟡","high":"🔴"}.get(r,"⚪")
+    st.markdown(f"""
+    <div class="badges-row">
+        <span class="badge {score_badge_class(f)}">⬡ Faith {f:.2f}</span>
+        <span class="badge {score_badge_class(c)}">◎ Conf {c:.2f}</span>
+        <span class="badge badge-cyan">◈ Sim {s:.2f}</span>
+        <span class="badge {'badge-green' if r=='low' else 'badge-yellow' if r=='medium' else 'badge-red'}">{risk_icon} {r.upper()}</span>
+    </div>""", unsafe_allow_html=True)
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
-
 with st.sidebar:
-    st.markdown("""
-    <div class="veridoc-header">
-        <div class="veridoc-logo">📜</div>
+    st.markdown(f"""
+    <div class="logo-wrap">
+        <div class="logo-icon">📜</div>
         <div>
-            <div class="veridoc-title">VeriDoc AI</div>
-            <div class="veridoc-sub">RAG · Citations · Eval</div>
+            <div class="logo-text">VeriDoc AI</div>
+            <div class="logo-sub">RAG · CITE · EVALUATE</div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+    </div>""", unsafe_allow_html=True)
 
-    # Upload
-    st.markdown('<div class="section-label">Upload Document</div>', unsafe_allow_html=True)
-    uploaded = st.file_uploader(
-        "Upload PDF", type=["pdf"], label_visibility="collapsed"
-    )
+    # Dark/Light toggle
+    st.markdown('<div class="sec-label">Appearance</div>', unsafe_allow_html=True)
+    mode_label = "🌙 Dark mode" if DARK else "☀️ Light mode"
+    if st.toggle(mode_label, value=DARK, key="dark_toggle"):
+        st.session_state.dark_mode = True
+    else:
+        st.session_state.dark_mode = False
+    if st.session_state.dark_mode != DARK:
+        st.rerun()
 
-    if uploaded:
-        with st.spinner("Parsing & indexing..."):
-            result = api_post(
-                "/upload",
-                files={"file": (uploaded.name, uploaded.getvalue(), "application/pdf")},
-            )
-        if result:
-            st.success(f"✓ Indexed: {uploaded.name}")
-            st.session_state.active_doc = result["doc_id"]
-            st.session_state.active_doc_name = uploaded.name
-            st.session_state.messages = []
-        else:
-            st.error("Upload failed. Is the API running?")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # Document list
-    st.markdown('<div class="section-label">Documents</div>', unsafe_allow_html=True)
+    # Documents list
+    st.markdown('<div class="sec-label">Documents</div>', unsafe_allow_html=True)
     docs_data = api_get("/documents")
     if docs_data and docs_data.get("documents"):
         for doc in docs_data["documents"]:
             is_active = doc["doc_id"] == st.session_state.active_doc
-            card_class = "doc-card active" if is_active else "doc-card"
-            if st.button(
-                f"{'▶ ' if is_active else ''}{doc['filename']}",
-                key=f"doc_{doc['doc_id']}",
-                use_container_width=True,
-            ):
+            label = f"{'▶  ' if is_active else ''}{doc['filename']}"
+            if st.button(label, key=f"doc_{doc['doc_id']}", use_container_width=True):
                 st.session_state.active_doc = doc["doc_id"]
                 st.session_state.active_doc_name = doc["filename"]
                 st.session_state.messages = []
                 st.rerun()
             st.markdown(
-                f'<div style="font-size:11px;color:#3a4a6a;margin:-6px 0 6px 4px;font-family:JetBrains Mono,monospace;">'
+                f'<div style="font-size:11px;color:{TEXT3};margin:-4px 0 6px 4px;font-family:JetBrains Mono,monospace;">'
                 f'{doc["total_pages"]}p · {doc["total_chunks"]} chunks</div>',
-                unsafe_allow_html=True,
-            )
+                unsafe_allow_html=True)
     else:
-        st.markdown(
-            '<div style="font-size:12px;color:#3a4a6a;padding:8px 0;">No documents yet.</div>',
-            unsafe_allow_html=True,
-        )
-
-    st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(f'<div style="font-size:12px;color:{TEXT3};padding:6px 2px;">No documents yet.</div>', unsafe_allow_html=True)
 
     # Settings
-    st.markdown('<div class="section-label">Settings</div>', unsafe_allow_html=True)
-    language = st.selectbox(
-        "Response language",
-        ["en", "hi", "te", "ta"],
-        format_func=lambda x: {"en":"English","hi":"Hindi","te":"Telugu","ta":"Tamil"}[x],
-        label_visibility="collapsed",
-    )
+    st.markdown('<div class="sec-label" style="margin-top:1rem;">Query Settings</div>', unsafe_allow_html=True)
+    language = st.selectbox("Language", ["en","hi","te","ta"],
+        format_func=lambda x: {"en":"🇬🇧 English","hi":"🇮🇳 Hindi","te":"🇮🇳 Telugu","ta":"🇮🇳 Tamil"}[x],
+        label_visibility="collapsed")
     top_k = st.slider("Chunks to retrieve", 2, 8, 5)
-    run_eval = st.toggle("Run RAGAS evaluation", value=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
+    run_eval = st.toggle("RAGAS evaluation", value=True)
     st.session_state.admin_mode = st.toggle("Admin view", value=st.session_state.admin_mode)
 
-
-# ── Main area ─────────────────────────────────────────────────────────────────
-
+# ── Main ──────────────────────────────────────────────────────────────────────
 if not st.session_state.active_doc:
-    # Landing state
-    st.markdown("""
-    <div style="text-align:center;padding:5rem 2rem;">
-        <div style="font-size:48px;margin-bottom:1rem;">📜</div>
-        <div style="font-size:28px;font-weight:600;color:#c8d4f0;margin-bottom:0.5rem;">VeriDoc AI</div>
-        <div style="font-size:15px;color:#4a5a7a;margin-bottom:2rem;">
-            Multilingual RAG assistant for legal, government & college documents
-        </div>
-        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
-            <span style="background:rgba(56,100,255,0.1);border:1px solid rgba(56,100,255,0.2);
-                border-radius:20px;padding:6px 14px;font-size:12px;color:#6890ff;">
-                📎 PDF Upload
-            </span>
-            <span style="background:rgba(0,210,190,0.1);border:1px solid rgba(0,210,190,0.2);
-                border-radius:20px;padding:6px 14px;font-size:12px;color:#00d2be;">
-                🔍 Semantic Search
-            </span>
-            <span style="background:rgba(255,180,0,0.1);border:1px solid rgba(255,180,0,0.2);
-                border-radius:20px;padding:6px 14px;font-size:12px;color:#ffb400;">
-                📊 RAGAS Evaluation
-            </span>
-            <span style="background:rgba(180,100,255,0.1);border:1px solid rgba(180,100,255,0.2);
-                border-radius:20px;padding:6px 14px;font-size:12px;color:#c878ff;">
-                🌐 Multilingual
+    # Landing — upload in center
+    st.markdown(f"""
+    <div style="text-align:center; padding: 3rem 1rem 1rem;">
+        <div style="font-size:50px; margin-bottom:1rem; filter:drop-shadow(0 0 20px rgba(99,102,241,0.5));">📜</div>
+        <div style="font-size:30px; font-weight:700; color:{TEXT}; letter-spacing:-0.5px; margin-bottom:0.5rem;">
+            Ask anything about your
+            <span style="background:linear-gradient(135deg,#6366f1,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">
+                documents
             </span>
         </div>
-        <div style="margin-top:3rem;font-size:13px;color:#3a4a6a;">
-            ← Upload a PDF in the sidebar to get started
+        <div style="font-size:14px; color:{TEXT2}; margin-bottom:2rem; line-height:1.7;">
+            Upload government schemes, legal notices, college circulars, or policy PDFs.<br>
+            Get cited answers with hallucination scores — in English, Hindi, Telugu or Tamil.
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        <div style="margin-bottom:2rem;">
+            <span class="feature-pill" style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2);color:#818cf8;">📎 PDF Upload</span>
+            <span class="feature-pill" style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);color:#34d399;">🔍 Vector Search</span>
+            <span class="feature-pill" style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);color:#fbbf24;">📊 RAGAS Eval</span>
+            <span class="feature-pill" style="background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);color:#a78bfa;">✦ Citations</span>
+            <span class="feature-pill" style="background:rgba(6,182,212,0.1);border:1px solid rgba(6,182,212,0.2);color:#22d3ee;">🌐 Multilingual</span>
+        </div>
+    </div>""", unsafe_allow_html=True)
+
+    # Upload zone in center of main page
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown(f'<div style="font-size:13px;font-weight:600;color:{TEXT2};text-align:center;margin-bottom:0.5rem;">Upload your PDF to get started</div>', unsafe_allow_html=True)
+        uploaded = st.file_uploader("Upload PDF", type=["pdf"], label_visibility="collapsed")
+        if uploaded:
+            with st.spinner("Parsing & indexing document..."):
+                result = api_post("/upload", files={"file": (uploaded.name, uploaded.getvalue(), "application/pdf")})
+            if result:
+                st.success(f"✓ Indexed: {uploaded.name}")
+                st.session_state.active_doc = result["doc_id"]
+                st.session_state.active_doc_name = uploaded.name
+                st.session_state.messages = []
+                st.rerun()
+            else:
+                st.error("Upload failed — is the API server running?")
+
+        st.markdown(f'<div style="text-align:center;font-size:12px;color:{TEXT3};margin-top:0.5rem;">or select an existing document from the sidebar</div>', unsafe_allow_html=True)
 
 else:
-    # Active document — split into chat + admin
+    # ── Active document view ──────────────────────────────────────────────────
     if st.session_state.admin_mode:
         chat_col, admin_col = st.columns([3, 2])
     else:
@@ -421,79 +416,85 @@ else:
         admin_col = None
 
     with chat_col:
-        # Document header
         st.markdown(f"""
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:1.5rem;">
-            <div style="width:8px;height:8px;border-radius:50%;background:#00c864;flex-shrink:0;"></div>
-            <div style="font-size:13px;color:#7a9ab0;font-family:'JetBrains Mono',monospace;">
-                {st.session_state.active_doc_name}
-            </div>
-            <div style="font-size:11px;color:#2a3a5a;font-family:'JetBrains Mono',monospace;">
-                · {st.session_state.active_doc[:8]}
-            </div>
-        </div>
+        <div class="main-header">
+            <div class="doc-indicator"></div>
+            <div style="font-size:13px;color:{TEXT2};font-family:'JetBrains Mono',monospace;">{st.session_state.active_doc_name}</div>
+            <div style="font-size:11px;color:{TEXT3};font-family:'JetBrains Mono',monospace;">· {st.session_state.active_doc[:8]}</div>
+            <div style="margin-left:auto;">
         """, unsafe_allow_html=True)
 
-        # Chat history
+        # Upload new doc button inline
+        with st.expander("+ Upload new document", expanded=False):
+            new_upload = st.file_uploader("New PDF", type=["pdf"], label_visibility="collapsed", key="new_upload")
+            if new_upload:
+                with st.spinner("Indexing..."):
+                    result = api_post("/upload", files={"file": (new_upload.name, new_upload.getvalue(), "application/pdf")})
+                if result:
+                    st.success(f"✓ {new_upload.name}")
+                    st.session_state.active_doc = result["doc_id"]
+                    st.session_state.active_doc_name = new_upload.name
+                    st.session_state.messages = []
+                    st.rerun()
+
+        # Empty state
+        if not st.session_state.messages:
+            st.markdown(f"""
+            <div style="text-align:center;padding:3rem 1rem 1rem;">
+                <div style="font-size:30px;margin-bottom:0.75rem;">💬</div>
+                <div style="font-size:15px;color:{TEXT2};margin-bottom:0.5rem;">Document ready</div>
+                <div style="font-size:13px;color:{TEXT3};">Ask a question below to get a cited answer</div>
+            </div>""", unsafe_allow_html=True)
+
+        # Chat messages
         for msg in st.session_state.messages:
             if msg["role"] == "user":
                 st.markdown(f"""
                 <div class="msg-user">
-                    <div class="msg-label">You</div>
+                    <div class="msg-user-label">You</div>
                     {msg["content"]}
-                </div>
-                """, unsafe_allow_html=True)
+                </div>""", unsafe_allow_html=True)
             else:
                 st.markdown(f"""
                 <div class="msg-ai">
-                    <div class="msg-label">VeriDoc AI</div>
+                    <div class="msg-ai-label">◆ VeriDoc AI</div>
                     {msg["content"]}
-                </div>
-                """, unsafe_allow_html=True)
+                </div>""", unsafe_allow_html=True)
 
-                # Citations
                 if msg.get("citations"):
                     with st.expander(f"📎 {len(msg['citations'])} source citations", expanded=False):
                         for c in msg["citations"]:
                             st.markdown(f"""
-                            <div class="citation-card">
+                            <div class="citation-wrap">
                                 <div class="citation-header">
-                                    Page {c['page']} · {c['source_file']} · score {c['similarity_score']:.3f}
+                                    <div class="citation-rank">{c['rank']}</div>
+                                    <div class="citation-meta">Page {c['page']} · {c['source_file']}</div>
+                                    <div class="citation-score">{c['similarity_score']:.3f}</div>
                                 </div>
-                                <div class="citation-text">{c['text'][:250]}...</div>
-                            </div>
-                            """, unsafe_allow_html=True)
+                                <div class="citation-text">{c['text'][:280]}...</div>
+                            </div>""", unsafe_allow_html=True)
 
-                # Evaluation scores
                 if msg.get("evaluation"):
-                    render_score_badges(msg["evaluation"])
+                    render_badges(msg["evaluation"])
 
-        # Input
         st.markdown("<br>", unsafe_allow_html=True)
         with st.form("chat_form", clear_on_submit=True):
-            question = st.text_input(
-                "Ask a question",
-                placeholder="e.g. Who is eligible for this scheme?",
-                label_visibility="collapsed",
-            )
-            submitted = st.form_submit_button("Ask →", use_container_width=False)
+            col1, col2 = st.columns([5, 1])
+            with col1:
+                question = st.text_input("q", placeholder="Ask a question about this document...", label_visibility="collapsed")
+            with col2:
+                submitted = st.form_submit_button("Ask →", use_container_width=True)
 
         if submitted and question.strip():
-            # Add user message
             st.session_state.messages.append({"role": "user", "content": question})
-
             with st.spinner("Searching document..."):
-                result = api_post(
-                    "/query",
-                    json={
-                        "doc_id": st.session_state.active_doc,
-                        "question": question,
-                        "k": top_k,
-                        "language": language,
-                        "run_eval": run_eval,
-                    },
-                )
-
+                result = api_post("/query", json={
+                    "doc_id": st.session_state.active_doc,
+                    "question": question,
+                    "k": top_k,
+                    "language": language,
+                    "run_eval": run_eval,
+                })
             if result:
                 st.session_state.last_response = result
                 st.session_state.messages.append({
@@ -505,83 +506,58 @@ else:
             else:
                 st.session_state.messages.append({
                     "role": "assistant",
-                    "content": "⚠️ Could not get a response. Please check the API is running.",
-                    "citations": [],
-                    "evaluation": None,
+                    "content": "⚠️ No response — check the API server is running.",
+                    "citations": [], "evaluation": None,
                 })
-
             st.rerun()
 
-    # Admin panel
+    # ── Admin panel ───────────────────────────────────────────────────────────
     if st.session_state.admin_mode and admin_col and st.session_state.last_response:
         with admin_col:
             resp = st.session_state.last_response
-
-            st.markdown('<div class="section-label">Admin · Retrieved Chunks</div>', unsafe_allow_html=True)
-
-            # Chunk table
-            st.markdown("""
-            <div style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);border-radius:10px;overflow:hidden;">
-            <div class="admin-row" style="color:#2a3a5a;border-bottom:1px solid rgba(255,255,255,0.08);">
-                <span class="admin-rank">#</span>
-                <span class="admin-score">Score</span>
-                <span class="admin-page">Page</span>
-                <span class="admin-text">Preview</span>
-            </div>
+            st.markdown(f'<div class="sec-label">Retrieved Chunks</div>', unsafe_allow_html=True)
+            st.markdown(f"""
+            <div style="background:{CARD_BG};border:1px solid {BORDER};border-radius:10px;overflow:hidden;">
+            <div class="admin-header"><span>#</span><span>Score</span><span>Page</span><span>Preview</span></div>
             """, unsafe_allow_html=True)
-
             for c in resp.get("citations", []):
-                preview = c["text"][:60].replace("\n", " ")
+                sc = score_color(c["similarity_score"])
+                preview = c["text"][:55].replace("\n", " ")
                 st.markdown(f"""
                 <div class="admin-row">
                     <span class="admin-rank">{c['rank']}</span>
-                    <span class="admin-score">{c['similarity_score']:.3f}</span>
-                    <span class="admin-page">p.{c['page']}</span>
-                    <span class="admin-text">{preview}…</span>
-                </div>
-                """, unsafe_allow_html=True)
-
+                    <span style="color:{sc};font-weight:600;font-family:'JetBrains Mono',monospace;">{c['similarity_score']:.3f}</span>
+                    <span class="admin-page-val">p.{c['page']}</span>
+                    <span class="admin-text-val">{preview}…</span>
+                </div>""", unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
-            # Eval metrics
             if resp.get("evaluation"):
-                st.markdown("<br>", unsafe_allow_html=True)
-                st.markdown('<div class="section-label">RAGAS Evaluation</div>', unsafe_allow_html=True)
-
                 ev = resp["evaluation"]
-                m1, m2 = st.columns(2)
-                with m1:
-                    st.markdown(f"""
-                    <div class="metric-box">
-                        <div class="metric-val">{ev['faithfulness']:.2f}</div>
-                        <div class="metric-lbl">Faithfulness</div>
-                    </div>""", unsafe_allow_html=True)
-                with m2:
-                    st.markdown(f"""
-                    <div class="metric-box">
-                        <div class="metric-val">{ev['answer_relevancy']:.2f}</div>
-                        <div class="metric-lbl">Relevancy</div>
-                    </div>""", unsafe_allow_html=True)
+                st.markdown(f'<div class="sec-label" style="margin-top:1rem;">RAGAS Metrics</div>', unsafe_allow_html=True)
+                metrics = [
+                    ("Faithfulness", ev.get("faithfulness", 0)),
+                    ("Relevancy",    ev.get("answer_relevancy", 0)),
+                    ("Confidence",   ev.get("confidence", 0)),
+                ]
+                cols = st.columns(2)
+                for i, (label, val) in enumerate(metrics):
+                    with cols[i % 2]:
+                        st.markdown(f"""
+                        <div class="metric-card">
+                            <div class="metric-val" style="color:{score_color(val)};">{val:.2f}</div>
+                            <div class="metric-lbl">{label}</div>
+                        </div>""", unsafe_allow_html=True)
 
-                st.markdown("<br>", unsafe_allow_html=True)
-                m3, m4 = st.columns(2)
-                with m3:
+                risk = ev.get("hallucination_risk", "unknown")
+                risk_color = {"low":"#10b981","medium":"#f59e0b","high":"#f43f5e"}.get(risk,"#64748b")
+                risk_icon  = {"low":"🟢","medium":"🟡","high":"🔴"}.get(risk,"⚪")
+                with cols[1]:
                     st.markdown(f"""
-                    <div class="metric-box">
-                        <div class="metric-val">{ev['confidence']:.2f}</div>
-                        <div class="metric-lbl">Confidence</div>
-                    </div>""", unsafe_allow_html=True)
-                with m4:
-                    risk = ev['hallucination_risk']
-                    risk_color = {"low":"#00c864","medium":"#ffb400","high":"#ff3c3c"}.get(risk,"#888")
-                    st.markdown(f"""
-                    <div class="metric-box">
-                        <div class="metric-val" style="color:{risk_color};font-size:16px;">
-                            {'🟢' if risk=='low' else '🟡' if risk=='medium' else '🔴'} {risk.upper()}
-                        </div>
+                    <div class="metric-card">
+                        <div class="metric-val" style="color:{risk_color};font-size:14px;">{risk_icon} {risk.upper()}</div>
                         <div class="metric-lbl">Hallucination Risk</div>
                     </div>""", unsafe_allow_html=True)
 
-                st.markdown("<br>", unsafe_allow_html=True)
-                st.markdown('<div class="section-label">Raw Response</div>', unsafe_allow_html=True)
-                st.json(resp)
+                st.markdown(f'<div class="sec-label" style="margin-top:1rem;">Raw JSON</div>', unsafe_allow_html=True)
+                st.json(resp, expanded=False)
