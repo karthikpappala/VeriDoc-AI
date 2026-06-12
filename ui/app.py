@@ -6,7 +6,7 @@ Run: streamlit run ui/app.py
 import streamlit as st
 import requests
 import os
-API_BASE = os.getenv("API_BASE", "http://localhost:8000")
+API_BASE = os.getenv("API_BASE", "http://localhost:8080")
 
 st.set_page_config(
     page_title="VeriDoc AI",
