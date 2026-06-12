@@ -13,3 +13,4 @@ langchain-huggingface
 ragas
 datasets
 numpy
+streamlit
