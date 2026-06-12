@@ -1,0 +1,10 @@
+[server]
+headless = true
+enableCORS = false
+enableXsrfProtection = false
+port = 8501
+
+[browser]
+gatherUsageStats = false
+serverAddress = "karthikp1703-veridoc-ai.hf.space"
+serverPort = 443
