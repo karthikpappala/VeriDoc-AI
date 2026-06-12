@@ -5,5 +5,5 @@ python -m streamlit run ui/app.py \
   --server.address 0.0.0.0 \
   --server.headless true \
   --server.enableCORS false \
-  --server.enableXsrfProtection false \
-  nginx -g "daemon off;"
+  --server.enableXsrfProtection false &
+nginx -g "daemon off;"
