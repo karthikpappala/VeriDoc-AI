@@ -118,6 +118,3 @@ streamlit run ui/app.py
 
 ---
 
-## Resume Bullet
-
-> Built a multilingual RAG assistant (VeriDoc AI) for document Q&A with citation-grounded responses, hallucination evaluation via RAGAS, FAISS vector search, and Indic language support (Hindi/Telugu/Tamil) across user-uploaded PDFs — deployed with a real-time admin dashboard showing chunk retrieval, similarity scores, and confidence metrics.
