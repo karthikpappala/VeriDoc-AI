@@ -52,5 +52,4 @@ uvicorn api.main:app --reload
 streamlit run ui/app.py
 \`\`\`
 
-## Resume Bullet
-> Built and deployed VeriDoc AI — a multilingual RAG assistant for document Q&A with citation-grounded responses, hallucination evaluation via RAGAS, FAISS vector search, and Indic language support (Hindi/Telugu/Tamil) via NLLB-200 — served via FastAPI with a Streamlit admin dashboard, deployed on HuggingFace Spaces.
+
